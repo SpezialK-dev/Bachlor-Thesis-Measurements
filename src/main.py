@@ -11,7 +11,7 @@ with PYDHO800(address = "192.168.178.42") as dho:
     # Set memory depth to 10 million samples
     # both need to be set at the same time
     tx_depth = dho.memory_depth_t.M_10M
-    t = 10000000
+    t = 10000000 # memory depth
     fs = 1.25e9 # 1.25GSa/s
 
 
@@ -39,12 +39,31 @@ with PYDHO800(address = "192.168.178.42") as dho:
     magnitude[0] /= 2
     magnitude_dBV = 20 * np.log10(magnitude / 1.0)
 
-    avarage = np.average(data['y'])# sollte nur die Y achse sein? =>
+    #avaraging the fft calculation
+    print(len(magnitude_dBV))
+    chunk_size = 5
+    avg_vals = []
+    avg_val = 0
+    #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
+    for chunk in range(0, int(len(magnitude_dBV)/chunk_size)):
+        avg_val = np.average(magnitude_dBV[chunk*chunk_size:(chunk+1)*chunk_size])
+        print(avg_val)
+        # not optimal since increase runtime but should be fine?
+        for _ in range(0,chunk_size):
+            avg_vals.append(avg_val)
+
+    avg_vals.append(avg_val) # because for some reason this is an uneven number ?
+    avarage = np.average(magnitude_dBV)
 
     import matplotlib.pyplot as plt
     fig, axs = plt.subplots(2)
     axs[0].plot(data['x'], data['y'], label = "Ch1")
-    axs[1].plot(freqs / 1e3, magnitude)
+    #axs[0].axhline(0, color='black', label="0V") # TODO add line in the moddle of dataset
+    axs[1].axhline(avarage, color='black', label="Avg over whole dataset") # horizontal
+    axs[1].plot(freqs , magnitude_dBV, label="FFT in dBV")
+    axs[1].plot(freqs , avg_vals, color='r', label=f"Avg chunked : {chunk_size}")
+
+    plt.legend(loc='best')
     print(f"avarage {avarage} dB über die Messung")
 
 
