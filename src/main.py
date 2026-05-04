@@ -1,6 +1,8 @@
 from pydho800.pydho800 import PYDHO800
 from labdevices.oscilloscope import OscilloscopeRunMode
 import numpy as np
+import datetime
+import csv
 
 # runs fft on data, takes t and data for y axis
 def run_fft(data, t,):
@@ -20,12 +22,11 @@ def run_fft(data, t,):
     return magnitude_dBV, freqs
 
 
-with PYDHO800(address = "192.168.178.42") as dho:
+with PYDHO800(address = "192.168.178.79") as dho:
     print(f"Identify: {dho.identify()}")
 
     dho.set_channel_enable(0, True)
-    #dho.set_channel_enable(1, True)
-
+    dho.set_channel_enable(1, True)
 
 
     # Set memory depth to 10 million samples
@@ -85,7 +86,21 @@ with PYDHO800(address = "192.168.178.42") as dho:
     axs[4].plot(freqs_off / 1e6, magnitude_dBV_off, color="green", label="FFT off")
     axs[4].plot(freqs_on / 1e6, magnitude_dBV_on, label="FFT on")
 
+    # writing all of the data out to CSV files.
+    # possibly I could also save the FFT Raw values
+    timestamp = datetime.datetime.now()
+    with open(f'messung_on_{timestamp}', 'w+') as csv_file_messung_on:
+        raw_keys_on = ['x','y']
+        writer = csv.DictWriter(csv_file_messung_on, raw_keys_on)
+        writer.writeheader()
+        writer.writerow(data_power_on)
 
+
+    with open(f'messung_off_{timestamp}', 'w+') as csv_file_messung_off:
+        raw_keys_off = ['x','y']
+        writer = csv.DictWriter(csv_file_messung_off, raw_keys_off)
+        writer.writeheader()
+        writer.writerow(data_power_off)
 
     plt.legend(loc='best')
     print(f"avarage {avarage} dB über die Messung")

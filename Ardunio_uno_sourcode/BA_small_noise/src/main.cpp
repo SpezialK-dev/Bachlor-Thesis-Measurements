@@ -27,14 +27,12 @@ void loop()
   digitalWrite(LED_BUILTIN, HIGH);
   digitalWrite(SCOPE_TRACE, HIGH);
 
-
-  // wait for a second
-  delay(10000);
+  //wait for 5 seconds
+  delay(5000);
 
   // turn the LED off by making the voltage LOW
   digitalWrite(LED_BUILTIN, LOW);
   digitalWrite(SCOPE_TRACE, LOW);
 
-   // wait for a second
-  delay(10000);
+  delay(5000);
 }
