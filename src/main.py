@@ -3,7 +3,13 @@ from labdevices.oscilloscope import OscilloscopeRunMode
 import numpy as np
 import datetime
 import json
+from pathlib import Path
 
+def save_to_json(data, material:str, state:str, timestamp, run):
+    file_path = Path(f'measurements/{material}/messung_{state}_{run}_{timestamp}.json')
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_path, 'w+') as json_file_messung:
+            json.dump(data,  json_file_messung)
 # runs fft on data, takes t and data for y axis
 def run_fft(data, t,):
     # https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
@@ -94,22 +100,10 @@ with PYDHO800(address = "192.168.178.79") as dho:
 
     # data saving goes to json since its the easiest to restore than csv and requires no paarsing or similar
     timestamp = datetime.datetime.now()
-    with open(f'messung_on_{timestamp}.json', 'w+') as csv_file_messung_on:
-        json.dump(data_power_on,  csv_file_messung_on)
-        #raw_keys_on = ['x','y']
 
-        #writer = csv.DictWriter(csv_file_messung_on, raw_keys_on)
-        #writer.writeheader()
-        #writer.writerow(data_power_on)
+    save_to_json(data_power_off,"paper", "no_paper", timestamp, "1")
+    save_to_json(data_power_on,"paper", "paper", timestamp, "1")
 
-
-    with open(f'messung_off_{timestamp}.json', 'w+') as csv_file_messung_off:
-        json.dump(data_power_off,  csv_file_messung_off)
-
-        #raw_keys_off = ['x','y']
-        #writer = csv.DictWriter(csv_file_messung_off, raw_keys_off)
-        #writer.writeheader()
-        #writer.writerow(data_power_off)
 
     plt.legend(loc='best')
     print(f"avarage {avarage} dB über die Messung")
