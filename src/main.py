@@ -2,10 +2,12 @@ from pydho800.pydho800 import PYDHO800
 from labdevices.oscilloscope import OscilloscopeRunMode
 import numpy as np
 import datetime
-import csv
+import json
 
 # runs fft on data, takes t and data for y axis
 def run_fft(data, t,):
+    # https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
+    # # TODO rework based on the above mentioend literature
     y = data
     dt = t
     N = len(y)
@@ -22,11 +24,26 @@ def run_fft(data, t,):
     return magnitude_dBV, freqs
 
 
+# does some avaraging
+def avg(data, chunk_size):
+    avg_vals = []
+    avg_val = 0
+    #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
+    for chunk in range(0, int(len(data)/chunk_size)):
+        avg_val = np.average(data[chunk*chunk_size:(chunk+1)*chunk_size])
+        print(avg_val)
+        # not optimal since increase runtime but should be fine?
+        for _ in range(0,chunk_size):
+            avg_vals.append(avg_val)
+    if(len(data) > len(avg_vals)):
+        avg_vals.append(avg_val) # because for some reason this is an uneven number ? ( sometimes)
+    return avg_vals
+
 with PYDHO800(address = "192.168.178.79") as dho:
     print(f"Identify: {dho.identify()}")
 
     dho.set_channel_enable(0, True)
-    dho.set_channel_enable(1, True)
+    #dho.set_channel_enable(1, True)
 
 
     # Set memory depth to 10 million samples
@@ -57,20 +74,9 @@ with PYDHO800(address = "192.168.178.79") as dho:
     magnitude_dBV_off, freqs_off= run_fft(data_power_off['y'],t)
 
 
-    #avaraging the fft calculation
-    print(len(magnitude_dBV_on))
-    chunk_size = 5
-    avg_vals = []
-    avg_val = 0
-    #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
-    for chunk in range(0, int(len(magnitude_dBV_on)/chunk_size)):
-        avg_val = np.average(magnitude_dBV_on[chunk*chunk_size:(chunk+1)*chunk_size])
-        print(avg_val)
-        # not optimal since increase runtime but should be fine?
-        for _ in range(0,chunk_size):
-            avg_vals.append(avg_val)
+    # avg the fft val
+    avg_vals = avg(magnitude_dBV_on,5)
 
-    avg_vals.append(avg_val) # because for some reason this is an uneven number ?
     avarage = np.average(magnitude_dBV_on)
 
     import matplotlib.pyplot as plt
@@ -79,28 +85,31 @@ with PYDHO800(address = "192.168.178.79") as dho:
     #axs[0].axhline(0, color='black', label="0V") # TODO add line in the moddle of dataset
     axs[1].axhline(avarage, color='black', label="Avg over whole dataset") # horizontal
     axs[1].plot(freqs_on / 1e6, magnitude_dBV_on, label="FFT in dBV")
-    axs[1].plot(freqs_on /1e6, avg_vals, color='r', label=f"Avg chunked : {chunk_size}")
+    axs[1].plot(freqs_on /1e6, avg_vals, color='r', label=f"Avg chunked : {5}")
     axs[2].plot(data_power_off['x'], data_power_off['y'], label = "Ch1")
     #axs[0].axhline(0, color='black', label="0V") # TODO add line in the moddle of dataset
     axs[3].plot(freqs_off / 1e6, magnitude_dBV_off, label="FFT in dBV")
     axs[4].plot(freqs_off / 1e6, magnitude_dBV_off, color="green", label="FFT off")
     axs[4].plot(freqs_on / 1e6, magnitude_dBV_on, label="FFT on")
 
-    # writing all of the data out to CSV files.
-    # possibly I could also save the FFT Raw values
+    # data saving goes to json since its the easiest to restore than csv and requires no paarsing or similar
     timestamp = datetime.datetime.now()
-    with open(f'messung_on_{timestamp}', 'w+') as csv_file_messung_on:
-        raw_keys_on = ['x','y']
-        writer = csv.DictWriter(csv_file_messung_on, raw_keys_on)
-        writer.writeheader()
-        writer.writerow(data_power_on)
+    with open(f'messung_on_{timestamp}.json', 'w+') as csv_file_messung_on:
+        json.dump(data_power_on,  csv_file_messung_on)
+        #raw_keys_on = ['x','y']
+
+        #writer = csv.DictWriter(csv_file_messung_on, raw_keys_on)
+        #writer.writeheader()
+        #writer.writerow(data_power_on)
 
 
-    with open(f'messung_off_{timestamp}', 'w+') as csv_file_messung_off:
-        raw_keys_off = ['x','y']
-        writer = csv.DictWriter(csv_file_messung_off, raw_keys_off)
-        writer.writeheader()
-        writer.writerow(data_power_off)
+    with open(f'messung_off_{timestamp}.json', 'w+') as csv_file_messung_off:
+        json.dump(data_power_off,  csv_file_messung_off)
+
+        #raw_keys_off = ['x','y']
+        #writer = csv.DictWriter(csv_file_messung_off, raw_keys_off)
+        #writer.writeheader()
+        #writer.writerow(data_power_off)
 
     plt.legend(loc='best')
     print(f"avarage {avarage} dB über die Messung")
