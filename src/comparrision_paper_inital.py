@@ -1,7 +1,6 @@
-from turtle import color
 import numpy as np
 import matplotlib.pyplot as plt
-from common_funcs import run_fft
+from common_funcs import run_fft, get_measurements ,avarage_traces_over_dicts
 
 # data import failed idk I cba to fix it rn so I just pasted the csv data manually into the file this does the job
 # its not really portable but since these measurements are not really important but just to prove a point it does not matter that much
@@ -36,9 +35,12 @@ sr = 1.25e9 # 1.25GSa/s
 sr_1_2 = 625e6 # 625 MSa/s
 
 
+no_paper_messurements, paper_measurements= get_measurements("paper",("no-paper", "paper"))
+out_x_no_paper, out_y_no_paper = avarage_traces_over_dicts(no_paper_messurements)
+out_x_paper, out_y_paper = avarage_traces_over_dicts(paper_measurements)
 
-magnitude_dBV_no_paper, freqs_no_paper = run_fft(y_no_paper, sr_1_2)
-magnitude_dBV_paper, freqs_paper= run_fft(y_with_paper, sr_1_2)
+magnitude_dBV_no_paper, freqs_no_paper = run_fft(out_y_no_paper, sr_1_2)
+magnitude_dBV_paper, freqs_paper= run_fft(out_y_paper, sr_1_2)
 
 
 
