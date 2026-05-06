@@ -11,23 +11,17 @@ def save_to_json(data, material:str, state:str, timestamp, run):
     with open(file_path, 'w+') as json_file_messung:
             json.dump(data,  json_file_messung)
 # runs fft on data, takes t and data for y axis
-def run_fft(data, t,):
-    # https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
-    # # TODO rework based on the above mentioend literature
-    y = data
-    dt = t
+# https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
+def run_fft(y, sampling_rate):
     N = len(y)
+    n = np.arange(N)
+    T = N/sampling_rate
+    freqs = n/T
 
-    y = y - np.mean(y) #removes DC offset
-    window = np.hanning(N)
-    y_windowed = y * window
-    Y = np.fft.rfft(y_windowed)
-    freqs = np.fft.rfftfreq(N, d=dt)
-    window_correction = 1.0 / (np.sum(window) / N)
-    magnitude = (2.0 / N) * window_correction * np.abs(Y)
-    magnitude[0] /= 2
-    magnitude_dBV = 20 * np.log10(magnitude / 1.0)
+    Y = np.fft.fft(y)
+    magnitude_dBV = 20 * np.log10(Y / 1.0)
     return magnitude_dBV, freqs
+
 
 
 # does some avaraging
@@ -76,8 +70,8 @@ with PYDHO800(address = "192.168.178.79") as dho:
     data_power_off = dho.query_waveform(0)
 
     # fft calculation
-    magnitude_dBV_on, freqs_on= run_fft(data_power_on['y'],t)
-    magnitude_dBV_off, freqs_off= run_fft(data_power_off['y'],t)
+    magnitude_dBV_on, freqs_on= run_fft(data_power_on['y'],t, fs)
+    magnitude_dBV_off, freqs_off= run_fft(data_power_off['y'],t, fs)
 
 
     # avg the fft val
