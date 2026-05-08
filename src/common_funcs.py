@@ -3,16 +3,38 @@ from pathlib import Path
 import json
 import os
 # https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
-def run_fft(y,sampling_rate):
+# more info on windowing https://community.sw.siemens.com/articles/en_US/Knowledge/window-types-hanning-flattop-uniform-tukey-and-exponential
+def run_fft(y:list[float],sampling_rate):
     N = len(y)
     n = np.arange(N)
     T = N/sampling_rate
     freqs = n/T
-
-    Y = np.fft.fft(y)
+    Y = np.abs(np.fft.fft(y))
     magnitude_dBV = 20 * np.log10(Y / 1.0)
     return magnitude_dBV, freqs
 
+# written by gemini
+def run_fft_improved(y: list[float], sampling_rate: float):
+    N = len(y)
+
+    # 1. Apply a window function (Scopes almost always do this)
+    window = np.hanning(N)
+    y_windowed = y * window
+
+    # 2. Compute FFT
+    # rfft only calculates the positive frequencies (Nyquist)
+    Y_fft = np.fft.rfft(y_windowed)
+    freqs = np.fft.rfftfreq(N, d=1/sampling_rate)
+
+    # 3. Scale the magnitude
+    # We divide by N/2 to normalize the amplitude correctly
+    # (And account for the window gain factor, approx 2.0 for Hanning)
+    magnitude = (np.abs(Y_fft) / N) * 2
+
+    # 4. Convert to dBV (Avoid log10(0) with a tiny epsilon)
+    magnitude_dBV = 20 * np.log10(magnitude + 1e-12)
+
+    return magnitude_dBV, freqs
 
 def save_to_json(data, material:str, state:str, timestamp, run):
     file_path = Path(f'measurements/{material}/messung_{state}_{run}_{timestamp}.json')
@@ -20,7 +42,7 @@ def save_to_json(data, material:str, state:str, timestamp, run):
     with open(file_path, 'w+') as json_file_messung:
             json.dump(data,  json_file_messung)
 
-
+# optains the measurements from json and returns them into the format needed for other functions
 def get_measurements(material, states:tuple[str,str]):
     path = f"measurements/{material}/"
     state_first = []
@@ -65,3 +87,18 @@ def avarage_traces_over_dicts(states:list):
         out_y.append(np.average(numbers_y))
         counter +=1
     return out_x, out_y
+
+# gives the avarage chuked for graphics purposes
+def avg(data, chunk_size):
+    avg_vals = []
+    avg_val = 0
+    #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
+    for chunk in range(0, int(len(data)/chunk_size)):
+        avg_val = np.average(data[chunk*chunk_size:(chunk+1)*chunk_size])
+        print(avg_val)
+        # not optimal since increase runtime but should be fine?
+        for _ in range(0,chunk_size):
+            avg_vals.append(avg_val)
+    if(len(data) > len(avg_vals)):
+        avg_vals.append(avg_val) # because for some reason this is an uneven number ? ( sometimes)
+    return avg_vals

@@ -4,102 +4,99 @@ import numpy as np
 import datetime
 import json
 from pathlib import Path
+from common_funcs import  avg, run_fft_improved, avarage_traces_over_dicts
+import time
 
 def save_to_json(data, material:str, state:str, timestamp, run):
     file_path = Path(f'measurements/{material}/messung_{state}_{run}_{timestamp}.json')
     file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, 'w+') as json_file_messung:
             json.dump(data,  json_file_messung)
-# runs fft on data, takes t and data for y axis
-# https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
-def run_fft(y, sampling_rate):
-    N = len(y)
-    n = np.arange(N)
-    T = N/sampling_rate
-    freqs = n/T
 
-    Y = np.fft.fft(y)
-    magnitude_dBV = 20 * np.log10(Y / 1.0)
-    return magnitude_dBV, freqs
+MEMORY_DEPTH:int = 10000000
+SAMPLING_RATE =  1.25e9 # 1.25GSa/s
+ROUND_COUNT = 3 # rounds per measurement
+MATERIAL:str = "Luft" #
+IP_ADDRESS:str = "192.168.178.28"
+STATES:tuple[str,str] = ("on", "off") # default states is on and off but can be replaced with diff things if needed
+CHUNK_SIZE_AVG = 10
+SLEEP_TIME_SEC = 10
 
-
-
-# does some avaraging
-def avg(data, chunk_size):
-    avg_vals = []
-    avg_val = 0
-    #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
-    for chunk in range(0, int(len(data)/chunk_size)):
-        avg_val = np.average(data[chunk*chunk_size:(chunk+1)*chunk_size])
-        print(avg_val)
-        # not optimal since increase runtime but should be fine?
-        for _ in range(0,chunk_size):
-            avg_vals.append(avg_val)
-    if(len(data) > len(avg_vals)):
-        avg_vals.append(avg_val) # because for some reason this is an uneven number ? ( sometimes)
-    return avg_vals
-
-with PYDHO800(address = "192.168.178.79") as dho:
+with PYDHO800(address = IP_ADDRESS, rawMode=True) as dho:
+    timestamp = datetime.datetime.now() # this is only donce once since we want to be able to have them all filtered to one dataset
+    state_1 = []
+    state_2 = []
     print(f"Identify: {dho.identify()}")
 
+    #
     dho.set_channel_enable(0, True)
-    #dho.set_channel_enable(1, True)
-
-
-    # Set memory depth to 10 million samples
-    # both need to be set at the same time
     tx_depth = dho.memory_depth_t.M_10M
-    t = 10000000 # memory depth
-    fs = 1.25e9 # 1.25GSa/s
-
-
     dho.set_timebase_scale(1e-6) # 1 us/div
     dho.set_memory_depth(tx_depth)
 
 
-    # Back to the oscilloscope
+    # Aqussition
     dho.set_run_mode(OscilloscopeRunMode.RUN)
-    dho.set_run_mode(OscilloscopeRunMode.STOP)
+    for i in range(0, ROUND_COUNT):
+        dho.set_run_mode(OscilloscopeRunMode.STOP)
+        time.sleep(SLEEP_TIME_SEC) #because scope dumb
+        data = dho.query_waveform(0)
+        dho.set_run_mode(OscilloscopeRunMode.RUN) # set before to allow the scope to normalize again
+        save_to_json(data,MATERIAL, STATES[0], timestamp, i)
+        state_1.append(data)
+        time.sleep(SLEEP_TIME_SEC)
+        print(f"aquired Round {i} of State {STATES[0]} ")
 
-    data_power_on = dho.query_waveform(0)
-    dho.set_run_mode(OscilloscopeRunMode.RUN) # set before to allow the scope to normalize again
 
-    print("TURN of to the Chip! (press any key once turned off)")
+
+    print(f"CHANGE TO STATE {STATES[1]}!!! press any key after change is done")
     _ = input()
-    dho.set_run_mode(OscilloscopeRunMode.STOP)
-    data_power_off = dho.query_waveform(0)
+    time.sleep(SLEEP_TIME_SEC)
 
-    # fft calculation
-    magnitude_dBV_on, freqs_on= run_fft(data_power_on['y'],t, fs)
-    magnitude_dBV_off, freqs_off= run_fft(data_power_off['y'],t, fs)
+    for i in range(0, ROUND_COUNT):
+        dho.set_run_mode(OscilloscopeRunMode.STOP)
+        time.sleep(SLEEP_TIME_SEC)
+        data = dho.query_waveform(0)
+        dho.set_run_mode(OscilloscopeRunMode.RUN) # set before to allow the scope to normalize again
+        save_to_json(data,MATERIAL, STATES[1], timestamp, i)
+        state_2.append(data)
+        print(f"aquired Round {i} of State {STATES[1]} ")
+        time.sleep(SLEEP_TIME_SEC)
+
+
+    # Avaragingn
+    avg_data_state_1_x,avg_data_state_1_y = avarage_traces_over_dicts(state_1)
+    avg_data_state_2_x,avg_data_state_2_y = avarage_traces_over_dicts(state_2)
+
+    # fft_calculation
+    magnitude_dBV_state_1, freqs_state_1= run_fft_improved(avg_data_state_1_y, SAMPLING_RATE)
+    magnitude_dBV_state_2, freqs_state_2= run_fft_improved(avg_data_state_2_y, SAMPLING_RATE)
 
 
     # avg the fft val
-    avg_vals = avg(magnitude_dBV_on,5)
+    avg_state_1 = avg(magnitude_dBV_state_1,CHUNK_SIZE_AVG)
+    avg_state_2 = avg(magnitude_dBV_state_2,CHUNK_SIZE_AVG)
 
-    avarage = np.average(magnitude_dBV_on)
+    avarage_state_1 = np.average(magnitude_dBV_state_1)
+    avarage_state_2 = np.average(magnitude_dBV_state_2)
 
     import matplotlib.pyplot as plt
-    fig, axs = plt.subplots(5)
-    axs[0].plot(data_power_on['x'], data_power_on['y'], label = "Ch1")
-    #axs[0].axhline(0, color='black', label="0V") # TODO add line in the moddle of dataset
-    axs[1].axhline(avarage, color='black', label="Avg over whole dataset") # horizontal
-    axs[1].plot(freqs_on / 1e6, magnitude_dBV_on, label="FFT in dBV")
-    axs[1].plot(freqs_on /1e6, avg_vals, color='r', label=f"Avg chunked : {5}")
-    axs[2].plot(data_power_off['x'], data_power_off['y'], label = "Ch1")
-    #axs[0].axhline(0, color='black', label="0V") # TODO add line in the moddle of dataset
-    axs[3].plot(freqs_off / 1e6, magnitude_dBV_off, label="FFT in dBV")
-    axs[4].plot(freqs_off / 1e6, magnitude_dBV_off, color="green", label="FFT off")
-    axs[4].plot(freqs_on / 1e6, magnitude_dBV_on, label="FFT on")
+    fig, axs = plt.subplots(2)
+    axs[0].plot(freqs_state_1 / 1e6, magnitude_dBV_state_1, color = "green" ,label=f"FFT von {STATES[0]}")
+    axs[0].plot(freqs_state_2 / 1e6, magnitude_dBV_state_2, color = "blue",label=f"FFT von {STATES[1]}" )
+    axs[0].set_ylabel("in dBV")
+    axs[0].set_xlabel("in MHz")
+    axs[0].set_title("FFT")
 
-    # data saving goes to json since its the easiest to restore than csv and requires no paarsing or similar
-    timestamp = datetime.datetime.now()
-
-    save_to_json(data_power_off,"paper", "no_paper", timestamp, "1")
-    save_to_json(data_power_on,"paper", "paper", timestamp, "1")
-
+    axs[1].plot(freqs_state_1 / 1e6, avg_state_1, color = "green" ,label=f"AVG FFT von {STATES[0]}")
+    axs[1].plot(freqs_state_2 / 1e6, avg_state_2, color = "blue",label=f"AVG FFT von {STATES[1]}" )
+    axs[1].axhline(avarage_state_1, color='lime', label=f"Avg whole Dataset von {STATES[0]}")
+    axs[1].axhline(avarage_state_2, color='dodgerblue', label=f"Avg whole Dataset von {STATES[1]}")
+    axs[1].set_ylabel("in dBV")
+    axs[1].set_xlabel("in MHz")
+    axs[1].set_title("FFT AVG's")
 
     plt.legend(loc='best')
-    print(f"avarage {avarage} dB über die Messung")
-
+    print(f"avarage {avarage_state_1} dB ueber die Messung von {STATES[0]}")
+    print(f"avarage {avarage_state_2} dB ueber die Messung von {STATES[1]}")
     plt.show(block=True)
