@@ -49,6 +49,9 @@ def get_measurements(material, states:tuple[str,str]):
     state_second = []
     files =os.listdir(path)
     for file in files:
+        if file.endswith(".png"):
+            print(f"skipped file {file}")
+            continue
         full_path= path+file
         with open(full_path, 'r') as file_open:
             data = json.load(file_open)

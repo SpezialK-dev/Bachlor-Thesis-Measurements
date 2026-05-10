@@ -11,4 +11,5 @@ pydho800==0.0.10
 pylabdevs-tspspi==0.0.18
 pyparsing==3.3.2
 python-dateutil==2.9.0.post0
+scipy==1.17.1
 six==1.17.0
