@@ -16,7 +16,7 @@ def save_to_json(data, material:str, state:str, timestamp, run):
 MEMORY_DEPTH:int = 10000000
 SAMPLING_RATE =  1.25e9 # 1.25GSa/s
 ROUND_COUNT = 3 # rounds per measurement
-MATERIAL:str = "Luft" #
+MATERIAL:str = "alu-folie_floating_durchlass" #
 IP_ADDRESS:str = "192.168.178.28"
 STATES:tuple[str,str] = ("on", "off") # default states is on and off but can be replaced with diff things if needed
 CHUNK_SIZE_AVG = 10

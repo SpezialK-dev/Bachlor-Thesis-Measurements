@@ -2,6 +2,9 @@ import numpy as np
 from pathlib import Path
 import json
 import os
+from scipy.signal import find_peaks
+from dataclasses import dataclass
+
 # https://pythonnumericalmethods.studentorg.berkeley.edu/notebooks/chapter24.04-FFT-in-Python.html
 # more info on windowing https://community.sw.siemens.com/articles/en_US/Knowledge/window-types-hanning-flattop-uniform-tukey-and-exponential
 def run_fft(y:list[float],sampling_rate):
@@ -59,7 +62,7 @@ def get_measurements(material, states:tuple[str,str]):
                 print(f"added file {file} to searched files")
                 state_first.append(data)
             # this is not ideal but should work well enough
-            else:
+            else:            
                 print(f"added file {file} to searched files")
                 state_second.append(data)
     return state_first, state_second
@@ -80,7 +83,9 @@ def avarage_traces_over_dicts(states:list):
             amount_per_list = len(list['y'])
     counter = 0
     while(counter < amount_per_list):
-        print(f"at datapoint: {counter} from: {amount_per_list}")
+        # Total runtime of the program is 286.1785628795624 seconds
+        # vs Total runtime of the program is 159.9607982635498 seconds without this line of code on the same dataset, so this is quite the difference 
+        #print(f"at datapoint: {counter} from: {amount_per_list}")
         numbers_x = []
         numbers_y = []
         for list in states:
@@ -98,10 +103,26 @@ def avg(data, chunk_size):
     #this should round one does not care to much since the data loss should be minimal even if this happens since at max 1 sample is lost at the end
     for chunk in range(0, int(len(data)/chunk_size)):
         avg_val = np.average(data[chunk*chunk_size:(chunk+1)*chunk_size])
-        print(avg_val)
+        #print(avg_val)
         # not optimal since increase runtime but should be fine?
         for _ in range(0,chunk_size):
             avg_vals.append(avg_val)
     if(len(data) > len(avg_vals)):
         avg_vals.append(avg_val) # because for some reason this is an uneven number ? ( sometimes)
     return avg_vals
+
+
+@dataclass
+class Peak:
+    index: int
+    frequenz :float # in MHz bereits 
+    dB :float
+
+def find_peaks_2D(frequencies:list, data:list, PEAK_baseline:int) -> list[Peak]:
+    # this uses a very dumb horristic currently by just detecting everything thats over a certain baseline which should be around -80dB
+    # for most cases but this is not perfect and should be improved in the future.
+    peaks ,_ = find_peaks(data, height=PEAK_baseline)
+    output = []
+    for i in peaks:
+        output.append(Peak(i,(frequencies[i]/1e6),data[i]))
+    return output
