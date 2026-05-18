@@ -144,12 +144,3 @@ def smoothing_peaks(peaks:list[Peak], smoothing_val:float)-> list[Peak]:
     out_arr.append(current_max_peak)
     return out_arr
 
-
-def diff_traces(baseline,to_substract):
-    diff_arr = []
-    max_counter = len(baseline)
-    counter = 0
-    while(counter < max_counter):
-        diff_arr.append(baseline[counter] - to_substract[counter])
-        counter +=1
-    return diff_arr

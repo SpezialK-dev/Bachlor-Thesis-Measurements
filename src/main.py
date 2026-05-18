@@ -16,7 +16,7 @@ def save_to_json(data, material:str, state:str, timestamp, run):
 MEMORY_DEPTH:int = 10000000
 SAMPLING_RATE =  1.25e9 # 1.25GSa/s
 ROUND_COUNT = 3 # rounds per measurement
-MATERIAL:str = "alu-folie_floating_durchlass" #
+MATERIAL:str = "alu-folie_grounded_durchlass" #
 IP_ADDRESS:str = "192.168.178.28"
 STATES:tuple[str,str] = ("on", "off") # default states is on and off but can be replaced with diff things if needed
 CHUNK_SIZE_AVG = 10
@@ -34,7 +34,7 @@ with PYDHO800(address = IP_ADDRESS, rawMode=True) as dho:
     dho.set_timebase_scale(1e-6) # 1 us/div
     dho.set_memory_depth(tx_depth)
 
-
+    print(f"Aquisstion for : {MATERIAL}")
     # Aqussition
     dho.set_run_mode(OscilloscopeRunMode.RUN)
     for i in range(0, ROUND_COUNT):
